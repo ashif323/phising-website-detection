@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phishing Detection System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Phishing URL Detection</h1>
+        <form method="POST" action="/predict">
+            <input type="text" name="url" placeholder="Enter URL to check" required>
+            <button type="submit">Check</button>
+        </form>
+
+        {% if prediction %}
+            <p><strong>URL:</strong> {{ url }}</p>
+            <p><strong>Prediction:</strong> {{ prediction }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>
