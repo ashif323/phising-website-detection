@@ -1,70 +1,142 @@
 import re
-import joblib
-import socket
 from urllib.parse import urlparse
-import requests
-
-# Load features list from model.pkl
-model_bundle = joblib.load('model.pkl')
-ALL_FEATURES = model_bundle['features']
-
-def has_dns_record(domain):
-    try:
-        socket.gethostbyname(domain)
-        return 1
-    except:
-        return -1
 
 def extract_features(url):
-    parsed = urlparse(url)
-    domain = parsed.netloc or parsed.path
+    features = []
 
-    # 1. IP Address in URL
-    having_ip = 1 if re.search(r'\d+\.\d+\.\d+\.\d+', url) else -1
+    # Feature 1: having_IP_Address
+    if re.match(r"^(?:http[s]?://)?\d{1,3}(?:\.\d{1,3}){3}", url):
+        features.append(1)
+    else:
+        features.append(-1)
 
-    # 2. URL Length
-    url_length = len(url)
+    # Feature 2: URL_Length
+    length = len(url)
+    if length < 54:
+        features.append(-1)
+    elif 54 <= length <= 75:
+        features.append(0)
+    else:
+        features.append(1)
 
-    # 3. Shortening service
-    shortening = 1 if re.search(r'bit\.ly|tinyurl\.com|goo\.gl', url) else -1
+    # Feature 3: Shortening_Service
+    shortening_services = r"bit\.ly|tinyurl\.com|goo\.gl|ow\.ly|t\.co|bitly\.com"
+    if re.search(shortening_services, url):
+        features.append(1)
+    else:
+        features.append(-1)
 
-    # 4. Abnormal URL (Check if domain not in URL)
-    abnormal_url = -1 if domain in url else 1
+    # Feature 4: having_At_Symbol
+    if '@' in url:
+        features.append(1)
+    else:
+        features.append(-1)
 
-    # 5. DNS record existence
-    dns_record = has_dns_record(domain)
+    # Feature 5: double_slash_redirecting
+    if url.find('//') > 6:
+        features.append(1)
+    else:
+        features.append(-1)
 
-    # 6. Domain registration length (Stubbed logic, needs WHOIS API for real implementation)
-    domain_registration_length = -1  # assume phishing (very short reg)
+    # Feature 6: Prefix_Suffix
+    if '-' in urlparse(url).netloc:
+        features.append(1)
+    else:
+        features.append(-1)
 
-    # 7. Favicon from external domain
-    try:
-        response = requests.get(url, timeout=2)
-        if 'favicon' in response.text:
-            favicon = 1 if domain in response.text else -1
+    # Feature 7: having_Sub_Domain
+    hostname = urlparse(url).hostname
+    if hostname:
+        dots = hostname.split('.')
+        if len(dots) <= 2:
+            features.append(-1)
+        elif len(dots) == 3:
+            features.append(0)
         else:
-            favicon = -1
-    except:
-        favicon = -1
+            features.append(1)
+    else:
+        features.append(1)
 
-    # 8. Google Index (real check needs web scraping or API, here stubbed)
-    google_index = 1 if "https://www.google.com/search?q=site:" + domain else -1
+    # Feature 8: SSLfinal_State
+    # Cannot check without requests or SSL cert, assuming -1
+    features.append(-1)
 
-    # Fill initial extracted values
-    extracted = {
-        'having_IP_Address': having_ip,
-        'URL_Length': url_length,
-        'Shortining_Service': shortening,
-        'Abnormal_URL': abnormal_url,
-        'DNSRecord': dns_record,
-        'Domain_registeration_length': domain_registration_length,
-        'Favicon': favicon,
-        'Google_Index': google_index,
-    }
+    # Feature 9: Domain_registeration_length
+    # Cannot check without WHOIS data, assuming 1 (short registration = phishing)
+    features.append(1)
 
-    # Fill missing features with 0 to match model training
-    for feature in ALL_FEATURES:
-        if feature not in extracted:
-            extracted[feature] = 0
+    # Feature 10: Favicon
+    features.append(-1)  # Cannot check here, assuming safe
 
-    return extracted
+    # Feature 11: port
+    if urlparse(url).port in [80, 443, None]:
+        features.append(-1)
+    else:
+        features.append(1)
+
+    # Feature 12: HTTPS_token
+    if 'https' in urlparse(url).netloc:
+        features.append(1)
+    else:
+        features.append(-1)
+
+    # Feature 13: Request_URL
+    features.append(-1)  # Needs webpage parsing, assuming safe
+
+    # Feature 14: URL_of_Anchor
+    features.append(-1)  # Needs HTML parsing
+
+    # Feature 15: Links_in_tags
+    features.append(-1)  # Needs HTML parsing
+
+    # Feature 16: SFH
+    features.append(-1)  # Needs HTML form parsing
+
+    # Feature 17: Submitting_to_email
+    features.append(-1)  # Needs HTML form parsing
+
+    # Feature 18: Abnormal_URL
+    features.append(1)  # Without WHOIS, assume abnormal
+
+    # Feature 19: Redirect
+    features.append(-1)  # Needs HTTP request
+
+    # Feature 20: on_mouseover
+    features.append(-1)  # Needs JS parsing
+
+    # Feature 21: RightClick
+    features.append(-1)  # Needs JS parsing
+
+    # Feature 22: popUpWidnow
+    features.append(-1)  # Needs JS parsing
+
+    # Feature 23: Iframe
+    features.append(-1)  # Needs HTML parsing
+
+    # Feature 24: age_of_domain
+    features.append(1)  # Without WHOIS, assume young domain
+
+    # Feature 25: DNSRecord
+    features.append(1)  # Without WHOIS, assume no record
+
+    # Feature 26: web_traffic
+    features.append(1)  # Without Alexa ranking, assume low traffic
+
+    # Feature 27: Page_Rank
+    features.append(1)  # Without rank data, assume low
+
+    # Feature 28: Google_Index
+    features.append(-1)  # Assume indexed
+
+    # Feature 29: Links_pointing_to_page
+    features.append(1)  # Without backlinks data, assume phishing
+
+    # Feature 30: Statistical_report
+    # Check if IP or suspicious domain
+    suspicious_domains = ['phishingsite.com', 'malicious.com']
+    if any(s in url for s in suspicious_domains):
+        features.append(1)
+    else:
+        features.append(-1)
+
+    return features

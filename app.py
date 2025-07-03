@@ -1,14 +1,14 @@
 from flask import Flask, render_template, request
 import joblib
-import feature_extractor  # Your own script for extracting features
-import pandas as pd
+import numpy as np
+from feature_extractor import extract_features
 
 app = Flask(__name__)
 
-# Load the model bundle (model + feature names)
-model_bundle = joblib.load('model.pkl')
+# Load model bundle
+model_bundle = joblib.load('phishing_model.pkl')
 model = model_bundle['model']
-expected_features = model_bundle['features']
+features_list = model_bundle['features']
 
 @app.route('/')
 def home():
@@ -17,21 +17,20 @@ def home():
 @app.route('/predict', methods=['POST'])
 def predict():
     url = request.form['url']
-    
-    # Extract features using your custom function
-    features = feature_extractor.extract_features(url)
+    features = extract_features(url)
 
-    # Create a DataFrame with the correct feature order
-    data = pd.DataFrame([features])
+    if len(features) != len(features_list):
+        return render_template('result.html', prediction="Feature extraction mismatch. Expected {} features, got {}.".format(len(features_list), len(features)))
 
-    # Align columns to expected features, fill missing ones with 0
-    data = data.reindex(columns=expected_features, fill_value=0)
+    features_np = np.array([features])
+    prediction = model.predict(features_np)[0]
 
-    # Predict using the trained model
-    result = model.predict(data)[0]
-    prediction = "Phishing Website 🚫" if result == 1 else "Legitimate Website ✅"
+    if prediction == 1:
+        result = "⚠️ Phishing Website Detected"
+    else:
+        result = "✅ Legitimate Website"
 
-    return render_template('index.html', prediction=prediction, url=url)
+    return render_template('result.html', prediction=result)
 
 if __name__ == '__main__':
     app.run(debug=True)
